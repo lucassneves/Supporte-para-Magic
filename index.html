@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Creature Counter - Mobile</title>
+    <title>Status de Criatura - Mobile</title>
     <style>
         body {
             margin: 0;
@@ -18,7 +18,7 @@
             align-items: center;
             user-select: none;
             -webkit-user-select: none;
-            overflow: hidden; /* Trava a tela para não rolar */
+            overflow: hidden;
         }
 
         .title {
@@ -31,7 +31,7 @@
         }
 
         .power-display {
-            font-size: 22vw; /* Escala de acordo com a largura da tela */
+            font-size: 22vw;
             font-weight: bold;
             text-shadow: 0 0 20px rgba(255, 69, 0, 0.4);
             margin: 2vh 0 4vh 0;
@@ -60,10 +60,9 @@
             align-items: center;
             box-shadow: 0 4px 10px rgba(0,0,0,0.6);
             touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent; /* Remove o piscar azul de clique em celulares */
+            -webkit-tap-highlight-color: transparent;
         }
 
-        /* Mantém um limite máximo de tamanho para quem abrir no PC ou Tablet */
         @media (min-width: 500px) {
             .title { font-size: 1.5rem; }
             .power-display { font-size: 8rem; }
@@ -100,7 +99,7 @@
 </head>
 <body>
 
-    <div class="title">Status de Poder / Resistencia</div>
+    <div class="title">Status da Criatura "Poder / Resustencia"!</div>
 
     <div class="power-display" id="power">0 / 0</div>
 
@@ -112,12 +111,52 @@
     </div>
     
     <div class="reset-container">
-        <button class="reset-btn" onclick="resetStats()">Resetar Pontos?</button>
+        <button class="reset-btn" onclick="resetStats()">Destruir Exército</button>
     </div>
 
     <script>
         let stats = 0;
         const powerDisplay = document.getElementById('power');
+
+        // Contexto de áudio criado apenas quando o usuário clica a primeira vez
+        let audioCtx;
+
+        function playFeedback() {
+            // --- 1. VIBRAÇÃO ---
+            // Tenta vibrar o celular por 40 milissegundos (feedback curto e tátil)
+            if (navigator.vibrate) {
+                navigator.vibrate(40);
+            }
+
+            // --- 2. SOM DE CLIQUE SINTÉTICO ---
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Cria um oscilador para gerar o som
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                // Configura um som de "Tick" abafado (frequência cai rápido)
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.05);
+                
+                // Configura o volume (começa em 30% e zera rápido)
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                // Toca por 50 milissegundos
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.05);
+            } catch (e) {
+                console.log("Áudio não suportado neste navegador.");
+            }
+        }
 
         function changeStats(amount) {
             stats += amount;
@@ -127,6 +166,7 @@
             }
             
             updateDisplay();
+            playFeedback(); // Chama a função de som e vibração
             
             powerDisplay.style.transform = 'scale(1.1)';
             setTimeout(() => {
@@ -135,9 +175,10 @@
         }
 
         function resetStats() {
-            if(confirm("Deseja zerar os status da criatura?")) {
+            if(confirm("Deseja zerar os status?")) {
                 stats = 0;
                 updateDisplay();
+                playFeedback(); // Toca feedback no reset também
             }
         }
 

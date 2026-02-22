@@ -3,13 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Status de Criatura - Mobile</title>
+    <meta name="theme-color" id="meta-theme-color" content="#1a0f0f">
+    <title>Status da Criatura - Mobile</title>
     <style>
+        :root {
+            --primary-color: #ff4500; /* Laranja padrão */
+            --bg-button: #2b1717;
+            --glow-color: rgba(255, 69, 0, 0.4);
+            --bg-app: #1a0f0f;
+        }
+
         body {
             margin: 0;
             padding: 0;
-            background-color: #1a0f0f;
-            color: #ff4500;
+            background-color: var(--bg-app);
+            color: var(--primary-color);
             font-family: 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
@@ -19,6 +27,24 @@
             user-select: none;
             -webkit-user-select: none;
             overflow: hidden;
+            touch-action: manipulation; /* Bloqueia zoom duplo no iOS */
+        }
+
+        /* Botão de Trocar Cor no canto superior direito */
+        .theme-btn {
+            position: absolute;
+            top: 3vh;
+            right: 5vw;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            padding: 0;
+            background-color: transparent;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            box-shadow: none;
+            z-index: 10;
         }
 
         .title {
@@ -31,11 +57,11 @@
         }
 
         .power-display {
-            font-size: 22vw;
+            font-size: clamp(4rem, 20vw, 8rem); /* Responsivo e seguro para números altos */
             font-weight: bold;
-            text-shadow: 0 0 20px rgba(255, 69, 0, 0.4);
+            text-shadow: 0 0 20px var(--glow-color);
             margin: 2vh 0 4vh 0;
-            transition: transform 0.05s ease-in-out;
+            transition: transform 0.05s ease-in-out, text-shadow 0.3s ease;
             white-space: nowrap;
         }
 
@@ -48,9 +74,9 @@
         }
 
         button {
-            background-color: #2b1717;
-            color: #ff4500;
-            border: 2px solid #ff4500;
+            background-color: var(--bg-button);
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
             border-radius: 15px;
             font-size: 8vw;
             padding: 25px 0;
@@ -61,17 +87,18 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.6);
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
 
         @media (min-width: 500px) {
             .title { font-size: 1.5rem; }
-            .power-display { font-size: 8rem; }
             button { font-size: 2.5rem; padding: 20px 0; }
+            .theme-btn { right: 20px; top: 20px; }
         }
 
         button:active {
-            background-color: #ff4500;
-            color: #1a0f0f;
+            background-color: var(--primary-color);
+            color: var(--bg-app);
             transform: scale(0.95);
         }
 
@@ -99,7 +126,9 @@
 </head>
 <body>
 
-    <div class="title">Status da Criatura<br>Poder / Resustencia!</div>
+    <button class="theme-btn" onclick="changeTheme()">🎨</button>
+
+    <div class="title">Status da Criatura<br>Power / Toughness</div>
 
     <div class="power-display" id="power">0 / 0</div>
 
@@ -111,62 +140,94 @@
     </div>
     
     <div class="reset-container">
-        <button class="reset-btn" onclick="resetStats()">Resetar Status?</button>
+        <button class="reset-btn" onclick="resetStats()">Resetar Status</button>
     </div>
 
     <script>
         let stats = 0;
         const powerDisplay = document.getElementById('power');
-
-        // Contexto de áudio criado apenas quando o usuário clica a primeira vez
         let audioCtx;
+        let wakeLock = null;
+
+        // Gerenciamento de Cores (Laranja, Verde, Azul, Branco)
+        const themes = [
+            { primary: '#ff4500', bgBtn: '#2b1717', glow: 'rgba(255, 69, 0, 0.4)' }, // Laranja
+            { primary: '#00cc44', bgBtn: '#00260d', glow: 'rgba(0, 204, 68, 0.4)' }, // Verde
+            { primary: '#0099ff', bgBtn: '#001a33', glow: 'rgba(0, 153, 255, 0.4)' }, // Azul
+            { primary: '#ffffff', bgBtn: '#222222', glow: 'rgba(255, 255, 255, 0.4)' }  // Branco
+        ];
+        let currentThemeIndex = 0;
+
+        function changeTheme() {
+            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+            const t = themes[currentThemeIndex];
+            
+            document.documentElement.style.setProperty('--primary-color', t.primary);
+            document.documentElement.style.setProperty('--bg-button', t.bgBtn);
+            document.documentElement.style.setProperty('--glow-color', t.glow);
+            
+            playFeedback();
+        }
+
+        // Bloqueio de tela (Wake Lock) para a tela não apagar durante o jogo
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log('Wake Lock falhou:', err);
+            }
+        }
+        
+        // Solicita o Wake Lock assim que o usuário clica na tela pela primeira vez
+        document.body.addEventListener('click', requestWakeLock, { once: true });
+        document.addEventListener('visibilitychange', () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
 
         function playFeedback() {
-            // --- 1. VIBRAÇÃO ---
-            // Tenta vibrar o celular por 40 milissegundos (feedback curto e tátil)
+            // Vibração
             if (navigator.vibrate) {
                 navigator.vibrate(40);
             }
 
-            // --- 2. SOM DE CLIQUE SINTÉTICO ---
+            // Som Sintético mais alto e nítido
             try {
                 if (!audioCtx) {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 }
                 
-                // Cria um oscilador para gerar o som
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
                 
-                // Configura um som de "Tick" abafado (frequência cai rápido)
-                oscillator.type = 'sine';
+                // Usando 'triangle' ou 'square' o som fica muito mais audível em celulares
+                oscillator.type = 'triangle'; 
                 oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
                 oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.05);
                 
-                // Configura o volume (começa em 30% e zera rápido)
-                gainNode.gain.setValueAtTime(2.0, audioCtx.currentTime);
+                // Volume aumentado para 3.0 para garantir impacto
+                gainNode.gain.setValueAtTime(3.0, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
                 
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
                 
-                // Toca por 50 milissegundos
                 oscillator.start();
                 oscillator.stop(audioCtx.currentTime + 0.05);
             } catch (e) {
-                console.log("Áudio não suportado neste navegador.");
+                console.log("Áudio não suportado");
             }
         }
 
         function changeStats(amount) {
             stats += amount;
-            
-            if (stats < 0) {
-                stats = 0;
-            }
+            if (stats < 0) stats = 0;
             
             updateDisplay();
-            playFeedback(); // Chama a função de som e vibração
+            playFeedback();
             
             powerDisplay.style.transform = 'scale(1.1)';
             setTimeout(() => {
@@ -178,7 +239,7 @@
             if(confirm("Deseja zerar os status?")) {
                 stats = 0;
                 updateDisplay();
-                playFeedback(); // Toca feedback no reset também
+                playFeedback();
             }
         }
 
@@ -188,6 +249,3 @@
     </script>
 </body>
 </html>
-
-
-
